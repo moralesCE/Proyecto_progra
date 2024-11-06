@@ -1,21 +1,17 @@
+from PIL import Image, ImageTk
+
 class Veneno:
     def __init__(self):
         """
-        Inicializa el objeto Veneno. No necesita atributos adicionales, ya que su efecto es mortal.
+        Initializes the Veneno (poison) object and loads its image.
         """
-        pass
+        self.imagen = ImageTk.PhotoImage(Image.open("icons/veneno.png"))  # Load the poison image
 
     def consumir(self, hormiga):
         """
-        Método que "mata" a la hormiga al consumir el veneno, reduciendo su salud a 0.
+        Defines the effect of poison on the ant.
         
-        :param hormiga: La instancia de la hormiga que consume el veneno.
+        :param hormiga: The ant instance that consumes the poison.
         """
-        hormiga.modificar_salud(-100)  # Reduce la salud de la hormiga a 0 para simular la muerte
-        # Aquí se puede agregar la lógica para detener la simulación y eliminar el veneno de la casilla.
-        
-    def __str__(self):
-        """
-        Representación en cadena del objeto Veneno, útil para depuración.
-        """
-        return "Veneno: Mata a la hormiga"
+        hormiga.salud = 0  # Reduces health to zero
+        print("Hormiga ha consumido veneno. Salud reducida a cero.")

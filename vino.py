@@ -1,3 +1,5 @@
+from PIL import Image, ImageTk
+
 class Vino:
     def __init__(self, incremento_alcohol=10):
         """
@@ -6,6 +8,7 @@ class Vino:
         :param incremento_alcohol: Cantidad de nivel de alcohol que se incrementa al consumir el vino.
         """
         self.incremento_alcohol = incremento_alcohol
+        self.imagen = ImageTk.PhotoImage(Image.open("icons/vino.png"))
 
     def consumir(self, hormiga):
         """
