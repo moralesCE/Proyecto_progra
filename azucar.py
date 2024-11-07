@@ -1,11 +1,14 @@
+from PIL import Image, ImageTk
+
 class Azucar:
     def __init__(self, puntos=10):
         """
-        Inicializa el objeto Azúcar con la cantidad de puntos que otorga al ser consumido.
+        Inicializa el objeto Azúcar con la cantidad de puntos que otorga al ser consumido y carga su imagen.
         
         :param puntos: Cantidad de puntos que la hormiga recibe al consumir el azúcar.
         """
         self.puntos = puntos
+        self.imagen = ImageTk.PhotoImage(Image.open("icons/azucar.png"))  # Ajusta el tamaño según sea necesario
 
     def consumir(self, hormiga):
         """

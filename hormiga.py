@@ -1,109 +1,179 @@
-import random
-from tkinter import PhotoImage
+from PIL import Image, ImageTk
+from vino import Vino
 
 class Hormiga:
-    def __init__(self, posición_inicial, canvas):
-        """
-        Inicializa la hormiga con su posición inicial, atributos y carga imágenes para la animación.
-        
-        :param posición_inicial: Tupla (fila, columna) que define la posición inicial de la hormiga.
-        :param canvas: El canvas de Tkinter donde se mostrará la hormiga.
-        """
+    def __init__(self, posición_inicial, canvas, app, cell_size=50):
+        self.posición_inicial = posición_inicial
         self.posición = posición_inicial
+        self.canvas = canvas
+        self.cell_size = cell_size  # Tamaño de cada celda
         self.salud = 100
         self.nivel_alcohol = 0
         self.puntos = 0
-        self.secuencia_movimientos = []  # Para almacenar la secuencia de movimientos de la hormiga
-        self.anim_frame = 0  # Para alternar entre los dos fotogramas de animación
-
-        # Cargar dos imágenes para cada dirección
+        self.secuencia_movimientos = []
+        self.anim_frame = 0
+        self.dirección_actual = "abajo"
+        self.movimiento_pendiente = False  # Flag to avoid overlapping animations
+        self.app = app  # Reference to LaberintoApp to update points on GUI
+        
+        # Cargar imágenes para la animación de la hormiga en cada dirección
         self.imagenes = {
-            "arriba": [PhotoImage(file="hormiga/arriba/1.png"), PhotoImage(file="hormiga/arriba/2.png")],
-            "abajo": [PhotoImage(file="hormiga/abajo/1.png"), PhotoImage(file="hormiga/abajo/2.png")],
-            "izquierda": [PhotoImage(file="hormiga/izquierda/1.png"), PhotoImage(file="hormiga/izquierda/2.png")],
-            "derecha": [PhotoImage(file="hormiga/derecha/1.png"), PhotoImage(file="hormiga/derecha/2.png")]
+            "arriba": [
+                ImageTk.PhotoImage(Image.open("hormiga/arriba/1.png")),
+                ImageTk.PhotoImage(Image.open("hormiga/arriba/2.png"))
+            ],
+            "abajo": [
+                ImageTk.PhotoImage(Image.open("hormiga/abajo/1.png")),
+                ImageTk.PhotoImage(Image.open("hormiga/abajo/2.png"))
+            ],
+            "izquierda": [
+                ImageTk.PhotoImage(Image.open("hormiga/izquierda/1.png")),
+                ImageTk.PhotoImage(Image.open("hormiga/izquierda/2.png"))
+            ],
+            "derecha": [
+                ImageTk.PhotoImage(Image.open("hormiga/derecha/1.png")),
+                ImageTk.PhotoImage(Image.open("hormiga/derecha/2.png"))
+            ]
         }
         
-        # Canvas y representación de la hormiga en el canvas
-        self.canvas = canvas
+        # Inicializa la imagen de la hormiga en el canvas
+        x_centro = self.posición[1] * self.cell_size + self.cell_size // 2
+        y_centro = self.posición[0] * self.cell_size + self.cell_size // 2
         self.hormiga_imagen = self.canvas.create_image(
-            self.posición[1] * 20, self.posición[0] * 20,  # Asume que cada celda es de 20x20 píxeles
-            image=self.imagenes["abajo"][self.anim_frame]
+            x_centro, y_centro,
+            image=self.imagenes[self.dirección_actual][self.anim_frame]
         )
 
-    def mover(self, dirección):
-        """
-        Mueve la hormiga en una de las cuatro direcciones y actualiza su imagen.
+    def mover(self, direccion, laberinto):
+        """Moves the ant in the given direction and consumes items if present."""
+        if self.movimiento_pendiente:
+            return  # Skip if movement is already in progress
         
-        :param dirección: Dirección en la que se desea mover la hormiga.
-        """
-        if dirección == "arriba":
-            self.posición = (self.posición[0] - 1, self.posición[1])
-        elif dirección == "abajo":
-            self.posición = (self.posición[0] + 1, self.posición[1])
-        elif dirección == "izquierda":
-            self.posición = (self.posición[0], self.posición[1] - 1)
-        elif dirección == "derecha":
-            self.posición = (self.posición[0], self.posición[1] + 1)
-        
-        # Alternar entre las dos imágenes de la dirección actual
-        self.anim_frame = (self.anim_frame + 1) % 2
-        nueva_imagen = self.imagenes[dirección][self.anim_frame]
+        if not isinstance(direccion, str) or direccion not in ["arriba", "abajo", "izquierda", "derecha"]:
+            print(f"Error: 'direccion' should be a string ('arriba', 'abajo', 'izquierda', 'derecha'), got: {direccion}")
+            return
 
-        # Actualiza la posición de la imagen en el canvas
-        self.canvas.coords(
-            self.hormiga_imagen,
-            self.posición[1] * 20,  # Columna en el eje X
-            self.posición[0] * 20   # Fila en el eje Y
-        )
-        # Cambia la imagen según la dirección
-        self.canvas.itemconfig(self.hormiga_imagen, image=nueva_imagen)
-        
-        # Agrega el movimiento a la secuencia
-        self.secuencia_movimientos.append(dirección)
+        # Verify `direccion` is a string, not a list
+        if isinstance(direccion, list):
+            print(f"Error: 'direccion' should be a string, got a list: {direccion}")
+            direccion = direccion[0] if direccion else "abajo"  # Default to "abajo" if empty list
 
-    def comer(self, ítem):
+        nueva_fila, nueva_columna = self.posición
+        if direccion == "arriba":
+            nueva_fila -= 1
+        elif direccion == "abajo":
+            nueva_fila += 1
+        elif direccion == "izquierda":
+            nueva_columna -= 1
+        elif direccion == "derecha":
+            nueva_columna += 1
+
+        filas, columnas = laberinto.tamaño
+        if 0 <= nueva_fila < filas and 0 <= nueva_columna < columnas and laberinto.matriz[nueva_fila][nueva_columna] != 1:
+            # Move the ant to the new position and animate movement
+            self.posición = (nueva_fila, nueva_columna)
+            x_target = nueva_columna * self.cell_size + self.cell_size // 2
+            y_target = nueva_fila * self.cell_size + self.cell_size // 2
+            self.movimiento_pendiente = True
+            self.animar_movimiento(x_target, y_target, direccion)
+
+    def animar_movimiento(self, x_target, y_target, direccion):
+        """Animate the ant's movement toward the target position smoothly."""
+        # Ensure direccion is a string
+        if isinstance(direccion, list):
+            print(f"Error: 'direccion' should be a string, got a list: {direccion}")
+            direccion = direccion[0] if direccion else "abajo"  # Default to "abajo"
+
+        x_current, y_current = self.canvas.coords(self.hormiga_imagen)
+
+        if abs(x_target - x_current) > 1 or abs(y_target - y_current) > 1:
+            step_x = (x_target - x_current) / 5
+            step_y = (y_target - y_current) / 5
+            self.canvas.move(self.hormiga_imagen, step_x, step_y)
+            self.canvas.after(30, self.animar_movimiento, x_target, y_target, direccion)
+        else:
+            # Snap to final position
+            self.canvas.coords(self.hormiga_imagen, x_target, y_target)
+            self.movimiento_pendiente = False
+
+            # Update animation frame
+            self.anim_frame = (self.anim_frame + 1) % len(self.imagenes[direccion])
+            self.canvas.itemconfig(self.hormiga_imagen, image=self.imagenes[direccion][self.anim_frame])
+
+
+
+    def actualizar_animacion(self):
         """
-        Interactúa con el ítem encontrado en la celda. Modifica los atributos según el ítem.
-        
-        :param ítem: Tipo de ítem encontrado ('azúcar', 'vino', 'veneno').
+        Actualiza el fotograma de la hormiga para simular movimiento continuo en la dirección actual.
+        Este método alterna entre los fotogramas de la dirección actual.
         """
-        if ítem == "azúcar":
+        self.anim_frame = (self.anim_frame + 1) % len(self.imagenes[self.dirección_actual])
+        self.canvas.itemconfig(self.hormiga_imagen, image=self.imagenes[self.dirección_actual][self.anim_frame])
+
+
+    def reiniciar(self):
+        """Restaura la hormiga a su estado inicial."""
+        self.posición = self.posición_inicial
+        self.salud = 100
+        self.nivel_alcohol = 0
+        self.puntos = 0
+        self.secuencia_movimientos = []
+        self.anim_frame = 0
+        self.dirección_actual = "abajo"
+        # Mueve la imagen de la hormiga al inicio
+        x_centro = self.posición[1] * self.cell_size + self.cell_size // 2
+        y_centro = self.posición[0] * self.cell_size + self.cell_size // 2
+        self.canvas.coords(self.hormiga_imagen, x_centro, y_centro)
+        self.canvas.itemconfig(self.hormiga_imagen, image=self.imagenes[self.dirección_actual][self.anim_frame])
+
+    def comer(self, item, item_coords=None):
+        """Consumes an item and updates points and health based on item type."""
+        if item == "azúcar":
             self.puntos += 10
-        elif ítem == "vino":
-            self.modificar_nivel_alcohol(10)
-        elif ítem == "veneno":
-            self.modificar_salud(-100)  # Veneno reduce la salud a 0, matando a la hormiga
-        # Agrega el ítem consumido a la secuencia
-        self.secuencia_movimientos.append("comer")
-
-    def modificar_salud(self, cambio):
-        """
-        Ajusta el nivel de salud de la hormiga según el cambio indicado.
+            self.salud = min(100, self.salud + 5)
+            print("Hormiga comió azúcar. Salud incrementada y puntos ganados.")
+            self.app.actualizar_puntos(self.puntos)
         
-        :param cambio: Cantidad en la que se modifica la salud (puede ser positivo o negativo).
-        """
-        self.salud = max(0, min(self.salud + cambio, 100))  # Salud entre 0 y 100
-
-    def modificar_nivel_alcohol(self, cambio):
-        """
-        Ajusta el nivel de alcohol de la hormiga según el cambio indicado.
+        elif item == "vino" and item_coords:
+            vino = Vino()
+            self.modificar_nivel_alcohol(vino.incremento_alcohol)
+            self.salud = max(0, self.salud - 10)
+            print("Hormiga bebió vino. Salud reducida y nivel de alcohol incrementado.")
+            
+            # Remove Vino from canvas and matrix
+            fila, columna = item_coords
+            self.canvas.delete(self.app.placed_images[(fila, columna)])
+            del self.app.placed_images[(fila, columna)]
+            self.app.laberinto.matriz[fila][columna] = 0
+            self.app.laberinto.ítems["vino"] = [(f, c, v) for f, c, v in self.app.laberinto.ítems["vino"]
+                                                if (f, c) != (fila, columna)]
         
-        :param cambio: Cantidad en la que se modifica el nivel de alcohol (puede ser positivo o negativo).
-        """
-        self.nivel_alcohol = max(0, min(self.nivel_alcohol + cambio, 50))  # Nivel de alcohol entre 0 y 50
+        elif item == "veneno" and item_coords:
+            # "Kill" the ant by setting its health to 0 and removing it from canvas
+            self.salud = 0
+            print("Hormiga comió veneno. Creando nueva hormiga en la misma posición.")
+            
+            # Notify the LaberintoApp to create a new Hormiga in the same position
+            self.app.crear_nueva_hormiga(self.posición)
 
-    def algoritmo_genético(self):
-        """
-        Define una secuencia de movimientos para la hormiga, que puede mutar en cada generación.
-        Genera una secuencia aleatoria como ejemplo inicial.
-        """
-        acciones = ["arriba", "abajo", "izquierda", "derecha", "comer"]
-        self.secuencia_movimientos = [random.choice(acciones) for _ in range(10)]  # Ejemplo de secuencia de 10 pasos
+            # Remove Veneno from canvas and matrix
+            fila, columna = item_coords
+            self.canvas.delete(self.app.placed_images[(fila, columna)])
+            del self.app.placed_images[(fila, columna)]
+            self.app.laberinto.matriz[fila][columna] = 0
+            self.app.laberinto.ítems["veneno"] = [(f, c, v) for f, c, v in self.app.laberinto.ítems["veneno"]
+                                                if (f, c) != (fila, columna)]
+        
+        if self.salud <= 0:
+            self.canvas.delete(self.hormiga_imagen)  # Remove dead ant image from canvas
 
-    def __str__(self):
+    def modificar_nivel_alcohol(self, incremento):
         """
-        Representación en cadena de la hormiga, para visualizar sus atributos y estado actual.
+        Increases the level of alcohol by a specified amount.
+        
+        :param incremento: Amount to increase the alcohol level.
         """
-        return (f"Hormiga en posición {self.posición} | Salud: {self.salud} | "
-                f"Nivel de Alcohol: {self.nivel_alcohol} | Puntos: {self.puntos}")
+        self.nivel_alcohol += incremento
+        print(f"Nivel de alcohol de la hormiga incrementado en {incremento}. Nivel actual: {self.nivel_alcohol}")
+        # Optional: Add logic here to handle any effects of increased alcohol level.
+
