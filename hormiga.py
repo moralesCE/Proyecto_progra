@@ -1,3 +1,4 @@
+#hormiga.py
 from PIL import Image, ImageTk
 from vino import Vino
 
@@ -48,15 +49,10 @@ class Hormiga:
         """Moves the ant in the given direction and consumes items if present."""
         if self.movimiento_pendiente:
             return  # Skip if movement is already in progress
-        
+
         if not isinstance(direccion, str) or direccion not in ["arriba", "abajo", "izquierda", "derecha"]:
             print(f"Error: 'direccion' should be a string ('arriba', 'abajo', 'izquierda', 'derecha'), got: {direccion}")
             return
-
-        # Verify `direccion` is a string, not a list
-        if isinstance(direccion, list):
-            print(f"Error: 'direccion' should be a string, got a list: {direccion}")
-            direccion = direccion[0] if direccion else "abajo"  # Default to "abajo" if empty list
 
         nueva_fila, nueva_columna = self.posición
         if direccion == "arriba":
@@ -76,6 +72,16 @@ class Hormiga:
             y_target = nueva_fila * self.cell_size + self.cell_size // 2
             self.movimiento_pendiente = True
             self.animar_movimiento(x_target, y_target, direccion)
+
+            # Check for items to consume at the new position
+            item_value = laberinto.matriz[nueva_fila][nueva_columna]
+            if item_value == 2:  # azucar
+                self.comer("azúcar", (nueva_fila, nueva_columna))
+            elif item_value == 3:  # veneno
+                self.comer("veneno", (nueva_fila, nueva_columna))
+            elif item_value == 4:  # vino
+                self.comer("vino", (nueva_fila, nueva_columna))
+
 
     def animar_movimiento(self, x_target, y_target, direccion):
         """Animate the ant's movement toward the target position smoothly."""
@@ -133,21 +139,28 @@ class Hormiga:
             self.salud = min(100, self.salud + 5)
             print("Hormiga comió azúcar. Salud incrementada y puntos ganados.")
             self.app.actualizar_puntos(self.puntos)
-        
+            
+            # Remove azucar from canvas and matrix
+            if item_coords:
+                fila, columna = item_coords
+                self.canvas.delete(self.app.placed_images[(fila, columna)])  # Remove from canvas
+                del self.app.placed_images[(fila, columna)]  # Remove from placed images reference
+                self.app.laberinto.matriz[fila][columna] = 0  # Clear the matrix cell
+
         elif item == "vino" and item_coords:
             vino = Vino()
             self.modificar_nivel_alcohol(vino.incremento_alcohol)
             self.salud = max(0, self.salud - 10)
             print("Hormiga bebió vino. Salud reducida y nivel de alcohol incrementado.")
             
-            # Remove Vino from canvas and matrix
+            # Remove vino from canvas and matrix
             fila, columna = item_coords
             self.canvas.delete(self.app.placed_images[(fila, columna)])
             del self.app.placed_images[(fila, columna)]
             self.app.laberinto.matriz[fila][columna] = 0
             self.app.laberinto.ítems["vino"] = [(f, c, v) for f, c, v in self.app.laberinto.ítems["vino"]
                                                 if (f, c) != (fila, columna)]
-        
+
         elif item == "veneno" and item_coords:
             # "Kill" the ant by setting its health to 0 and removing it from canvas
             self.salud = 0
@@ -156,14 +169,14 @@ class Hormiga:
             # Notify the LaberintoApp to create a new Hormiga in the same position
             self.app.crear_nueva_hormiga(self.posición)
 
-            # Remove Veneno from canvas and matrix
+            # Remove veneno from canvas and matrix
             fila, columna = item_coords
             self.canvas.delete(self.app.placed_images[(fila, columna)])
             del self.app.placed_images[(fila, columna)]
             self.app.laberinto.matriz[fila][columna] = 0
             self.app.laberinto.ítems["veneno"] = [(f, c, v) for f, c, v in self.app.laberinto.ítems["veneno"]
                                                 if (f, c) != (fila, columna)]
-        
+
         if self.salud <= 0:
             self.canvas.delete(self.hormiga_imagen)  # Remove dead ant image from canvas
 

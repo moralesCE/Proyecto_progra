@@ -1,3 +1,4 @@
+#main.py
 import tkinter as tk
 import functools
 from tkinter import messagebox, simpledialog
